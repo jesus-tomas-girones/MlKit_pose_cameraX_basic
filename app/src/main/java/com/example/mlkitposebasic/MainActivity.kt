@@ -17,25 +17,42 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.mlkitposebasic.databinding.ActivityMainBinding
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.pose.PoseDetection
+import com.google.mlkit.vision.pose.PoseDetector
+import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-typealias PoseResultListener = (seDetectaCuerpo: Boolean) -> Unit
+typealias PoseResultListener = (seDetectaCuerpo : Boolean) -> Unit
 
 class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
+    private lateinit var poseDetector : PoseDetector
     private lateinit var cameraExecutor: ExecutorService
 
-    private class PoseAnalyzer(val listener: PoseResultListener) : ImageAnalysis.Analyzer {
+    private class PoseAnalyzer(val poseDetector: PoseDetector,
+                               val listener: PoseResultListener) : ImageAnalysis.Analyzer {
 
         @SuppressLint("UnsafeOptInUsageError")
         override fun analyze(imageProxy: ImageProxy) {
             val mediaImage = imageProxy.image
             if (mediaImage != null) {
-                val image =
-                    InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                listener(false)
-                imageProxy.close()
+                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                // Pass image to an ML Kit Vision API
+                poseDetector.process(image)
+                    .addOnSuccessListener { pose ->
+                        // Task completed successfully
+                        if (pose.allPoseLandmarks.isEmpty())
+                            listener(false)
+                        else
+                            listener(true)
+                        imageProxy.close()
+                    }
+                    .addOnFailureListener { e ->
+                        // Task failed with an exception
+                        listener(false)
+                        imageProxy.close()
+                    }
             }
         }
 
@@ -46,13 +63,18 @@ class MainActivity : AppCompatActivity() {
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
 
+        // Accurate pose detector
+        val options = AccuratePoseDetectorOptions.Builder()
+            .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
+            .build()
+        poseDetector = PoseDetection.getClient(options)
+
         // Request camera permissions
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
-            )
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
@@ -79,43 +101,40 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer { hayCuerpo ->
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector){ hayCuerpo ->
                         Log.d(TAG, "Se detecta cuerpo: $hayCuerpo")
                     })
                 }
+
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             try {
                 cameraProvider.unbindAll()  // Unbind use cases before rebinding
                 cameraProvider.bindToLifecycle( // Bind use cases to camera
-                    this, cameraSelector, preview, imageAnalyzer
-                )
-            } catch (exc: Exception) {
+                    this, cameraSelector, preview, imageAnalyzer)
+            } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
+
         }, ContextCompat.getMainExecutor(this))
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-            baseContext, it
-        ) == PackageManager.PERMISSION_GRANTED
+            baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults:
-        IntArray
-    ) {
+        IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 startCamera()
             } else {
-                Toast.makeText(
-                    this,
+                Toast.makeText(this,
                     "Permissions not granted by the user.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                    Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
@@ -125,7 +144,7 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "PoseDetectBasic"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
-            mutableListOf(
+            mutableListOf (
                 Manifest.permission.CAMERA
             ).apply {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {

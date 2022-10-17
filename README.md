@@ -11,3 +11,4 @@ También se piden los permisos al usuario.
 
 Se incorpora MLKit-Pose-Detection.
 Solo muestra un Log indicando si se ha encontrado una persona.
+Basado en: https://developers.google.com/ml-kit/vision/pose-detection/android
