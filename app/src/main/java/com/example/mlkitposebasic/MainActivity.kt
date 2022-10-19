@@ -3,7 +3,6 @@ package com.example.mlkitposebasic
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -27,19 +26,30 @@ import java.util.concurrent.Executors
 typealias PoseResultListener = (seDetectaCuerpo : Boolean) -> Unit
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var viewBinding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
     private lateinit var poseDetector : PoseDetector
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var graphicOverlay: GraphicOverlay
 
     private class PoseAnalyzer(val poseDetector: PoseDetector,
                                val graphicOverlay: GraphicOverlay,
+                               val cameraSelector: CameraSelector,
                                val listener: PoseResultListener) : ImageAnalysis.Analyzer {
-        @SuppressLint("UnsafeOptInUsageError")
+        @SuppressLint("UnsafeOptInUsageError", "RestrictedApi")
         override fun analyze(imageProxy: ImageProxy) {
             val mediaImage = imageProxy.image
             if (mediaImage != null) {
                 val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+                //TODO Posiblemente este código pueda ejecutarse solo una vez cuando se selecciona la cámara
+                val isImageFlipped = cameraSelector.lensFacing == CameraSelector.LENS_FACING_FRONT
+                val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                if (rotationDegrees == 0 || rotationDegrees == 180) {
+                    graphicOverlay.setImageSourceInfo(imageProxy.width, imageProxy.height, isImageFlipped)
+                } else {
+                    graphicOverlay.setImageSourceInfo(imageProxy.height, imageProxy.width, isImageFlipped)
+                }
+
                 // Pass image to an ML Kit Vision API
                 poseDetector.process(image)
                     .addOnSuccessListener { pose ->
@@ -49,11 +59,8 @@ class MainActivity : AppCompatActivity() {
                             listener(false)
                         else {
                             listener(true)
-                            //val nose = pose.getPoseLandmark(PoseLandmark.NOSE)
-                            //val rect: RectF = RectF(nose!!.position.x, nose!!.position.y, nose!!.position.x+100F, nose!!.position.y+100F)
-                            val rect: RectF = RectF(100F, 100F, 200F, 200F)
-                            val textGraphic = RectGraphic(graphicOverlay, rect)
-                            graphicOverlay.add(textGraphic)
+                            val poseGraphic = PoseGraphic(graphicOverlay,pose, false,false,false)
+                            graphicOverlay.add(poseGraphic)
                         }
                         imageProxy.close()
                     }
@@ -68,9 +75,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(viewBinding.root)
-        graphicOverlay = viewBinding.graphicOverlay
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        graphicOverlay = binding.graphicOverlay
 
         // Accurate pose detector
         val options = AccuratePoseDetectorOptions.Builder()
@@ -97,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
+
             // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
@@ -104,22 +112,21 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
+                    it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
             //Analyzer
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA //.DEFAULT_FRONT_CAMERA
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector, graphicOverlay){ hayCuerpo ->
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector, graphicOverlay, cameraSelector){ hayCuerpo ->
                         Log.d(TAG, "Se detecta cuerpo: $hayCuerpo")
                     })
                 }
-            // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             try {
                 cameraProvider.unbindAll()  // Unbind use cases before rebinding
                 cameraProvider.bindToLifecycle( // Bind use cases to camera
-                    this, cameraSelector, preview, imageAnalyzer)
+                    this, cameraSelector, preview,  imageAnalyzer)
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }

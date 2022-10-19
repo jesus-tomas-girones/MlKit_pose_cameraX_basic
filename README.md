@@ -17,4 +17,10 @@ Basado en: https://developers.google.com/ml-kit/vision/pose-detection/android
 
 Se incorpora GraphicOverlay.
 Cuando se detecta una persona se visualiza “persona” en las coordenadas (100,100) de pantalla.
-La clase GraphicOverlay está sacada de https://github.com/googlesamples/mlkit/tree/master/android/vision-quickstart
+La clase GraphicOverlay está sacada de https://github.com/googlesamples/mlkit/tree/master/android/vision-quickstart.
+OjO: Se ha comentado el cálculo de Z
+
+#COMMIT 4:
+
+Se añade PoseGraphic que visualiza las pose detecctada.
+Hay que llamar a graphicOverlay.setImageSourceInfo() para calcular el ajuste de coordenadas. Esta puesto en PoseAnalyzer.analyze(). Pero posiblemente no sea el mejor sitio.
