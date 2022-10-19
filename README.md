@@ -12,3 +12,9 @@ También se piden los permisos al usuario.
 Se incorpora MLKit-Pose-Detection.
 Solo muestra un Log indicando si se ha encontrado una persona.
 Basado en: https://developers.google.com/ml-kit/vision/pose-detection/android
+
+#COMMIT 3:
+
+Se incorpora GraphicOverlay.
+Cuando se detecta una persona se visualiza “persona” en las coordenadas (100,100) de pantalla.
+La clase GraphicOverlay está sacada de https://github.com/googlesamples/mlkit/tree/master/android/vision-quickstart

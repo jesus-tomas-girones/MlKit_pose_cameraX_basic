@@ -3,11 +3,12 @@ package com.example.mlkitposebasic
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.RectF
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -29,10 +30,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
     private lateinit var poseDetector : PoseDetector
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var graphicOverlay: GraphicOverlay
 
     private class PoseAnalyzer(val poseDetector: PoseDetector,
+                               val graphicOverlay: GraphicOverlay,
                                val listener: PoseResultListener) : ImageAnalysis.Analyzer {
-
         @SuppressLint("UnsafeOptInUsageError")
         override fun analyze(imageProxy: ImageProxy) {
             val mediaImage = imageProxy.image
@@ -42,10 +44,17 @@ class MainActivity : AppCompatActivity() {
                 poseDetector.process(image)
                     .addOnSuccessListener { pose ->
                         // Task completed successfully
+                        graphicOverlay.clear()
                         if (pose.allPoseLandmarks.isEmpty())
                             listener(false)
-                        else
+                        else {
                             listener(true)
+                            //val nose = pose.getPoseLandmark(PoseLandmark.NOSE)
+                            //val rect: RectF = RectF(nose!!.position.x, nose!!.position.y, nose!!.position.x+100F, nose!!.position.y+100F)
+                            val rect: RectF = RectF(100F, 100F, 200F, 200F)
+                            val textGraphic = RectGraphic(graphicOverlay, rect)
+                            graphicOverlay.add(textGraphic)
+                        }
                         imageProxy.close()
                     }
                     .addOnFailureListener { e ->
@@ -55,13 +64,13 @@ class MainActivity : AppCompatActivity() {
                     }
             }
         }
-
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
+        graphicOverlay = viewBinding.graphicOverlay
 
         // Accurate pose detector
         val options = AccuratePoseDetectorOptions.Builder()
@@ -101,11 +110,10 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector){ hayCuerpo ->
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector, graphicOverlay){ hayCuerpo ->
                         Log.d(TAG, "Se detecta cuerpo: $hayCuerpo")
                     })
                 }
-
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             try {
