@@ -31,15 +31,19 @@ import java.util.Locale
  * @param showInFrameLikelihood visualiza la probabilidad de cada punto
  * @param visualizeZ visualiza la profundidad (z) de cada línea (rojo->cerca, azul->lejos)
  * @param rescaleZForVisualiz si queremos que z se reescale entre valores max y min
+ * @param drawUnlikelyLines las líneas entre puntos con un valor de FrameLikelihood bajo son dibujados
+ *                           si es false y uno de los puntos de la línea tiene probabilidad <
+ *                           IN_IN_FRAME_LIKELIHOOD, no se pinta la línea
  * */
 
 class PoseGraphic
 internal constructor(overlay: GraphicOverlay,
                      private val pose: Pose,
-                     private val showInFrameLikelihood: Boolean,
-                     private val visualizeZ: Boolean,
-                     private val rescaleZForVisualiz: Boolean
-                    ) : GraphicOverlay.Graphic(overlay) {
+                     private val showInFrameLikelihood: Boolean = true,
+                     private val visualizeZ: Boolean  = true,
+                     private val rescaleZForVisualiz: Boolean  = true,
+                     private val drawUnlikelyLines: Boolean = true
+) : GraphicOverlay.Graphic(overlay) {
 
   private var zMin = java.lang.Float.MAX_VALUE
   private var zMax = java.lang.Float.MIN_VALUE
@@ -153,24 +157,29 @@ internal constructor(overlay: GraphicOverlay,
     }
   }
 
-  private fun drawPoint(canvas: Canvas, landmark: PoseLandmark, paint: Paint) {
+  private fun drawPoint(canvas: Canvas, landmark: PoseLandmark, paint: Paint){
     val point = landmark.position3D
     updatePaintColorByZValue(paint, canvas, visualizeZ, rescaleZForVisualiz, point.z, zMin, zMax)
     canvas.drawCircle(translateX(point.x), translateY(point.y), DOT_RADIUS, paint)
   }
 
   private fun drawLine(canvas: Canvas, startLandmark: PoseLandmark?, endLandmark: PoseLandmark?, paint: Paint) {
-    val start = startLandmark!!.position3D
-    val end = endLandmark!!.position3D
-    // Gets average z for the current body line
-    val avgZInImagePixel = (start.z + end.z) / 2
-    updatePaintColorByZValue(paint, canvas, visualizeZ, rescaleZForVisualiz, avgZInImagePixel, zMin, zMax)
-    canvas.drawLine(translateX(start.x), translateY(start.y), translateX(end.x), translateY(end.y), paint)
+    if (drawUnlikelyLines ||
+        (startLandmark!!.inFrameLikelihood>MIN_IN_FRAME_LIKELIHOOD &&
+         endLandmark!!.inFrameLikelihood>MIN_IN_FRAME_LIKELIHOOD)){
+      val start = startLandmark!!.position3D
+      val end = endLandmark!!.position3D
+      // Gets average z for the current body line
+      val avgZInImagePixel = (start.z + end.z) / 2
+      updatePaintColorByZValue(paint, canvas, visualizeZ, rescaleZForVisualiz, avgZInImagePixel, zMin, zMax)
+      canvas.drawLine(translateX(start.x), translateY(start.y), translateX(end.x), translateY(end.y), paint)
+    }
   }
 
   companion object {
     private const val DOT_RADIUS = 8.0f
     private const val IN_FRAME_LIKELIHOOD_TEXT_SIZE = 30.0f
     private const val STROKE_WIDTH = 10.0f
+    private const val MIN_IN_FRAME_LIKELIHOOD = 0.93f
   }
 }

@@ -61,7 +61,8 @@ class PoseAnalyzer(private val graphicOverlay: GraphicOverlay,
                         val poseGraphic = PoseGraphic(graphicOverlay,pose,
                             showInFrameLikelihood = true,
                             visualizeZ = true,
-                            rescaleZForVisualiz = true
+                            rescaleZForVisualiz = true,
+                            drawUnlikelyLines = false
                         )
                         graphicOverlay.add(poseGraphic)
                     }
