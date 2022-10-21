@@ -34,3 +34,10 @@ Mejoras varias:
 -Se saca la clase PoseAnalyzer de MainActivity
 -PoseGraphic: Se traduce las partes del cuerpo (Knee -> Rodilla)
 -Se cambian varias declaraciones de Kotlin para seguir las recomendaciones
+
+#COMMIT 6:
+
+Líneas con uno de sus puntos con poca probabilidad, no son dibujadas. 
+Los puntos y su probabilidad si son dibujados.
+PoseGraphic: se añade un nuevo parámetro drawUnlikelyLines
+ 
