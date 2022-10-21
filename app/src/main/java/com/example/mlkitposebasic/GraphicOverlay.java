@@ -24,10 +24,8 @@ import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
-
-//import com.google.common.base.Preconditions;
-//import com.google.common.primitives.Ints;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +75,7 @@ public class GraphicOverlay extends View {
    * instances to the overlay using {@link GraphicOverlay#add(Graphic)}.
    */
   public abstract static class Graphic {
-    private GraphicOverlay overlay;
+    private final GraphicOverlay overlay;
 
     public Graphic(GraphicOverlay overlay) {
       this.overlay = overlay;
@@ -198,17 +196,21 @@ public class GraphicOverlay extends View {
         // Maps values within [zLowerBoundInScreenPixel, 0) to [255, 0) and use it to control the
         // color. The larger the value is, the more red it will be.
         int v = (int) (zInScreenPixel / zLowerBoundInScreenPixel * 255);
-        //v = Ints.constrainToRange(v, 0, 255);
+        v = constrainToRange(v, 0, 255);
         paint.setARGB(255, 255, 255 - v, 255 - v);
       } else {
         // Sets up the paint to be blue if the item is behind the z origin.
         // Maps values within [0, zUpperBoundInScreenPixel] to [0, 255] and use it to control the
         // color. The larger the value is, the more blue it will be.
         int v = (int) (zInScreenPixel / zUpperBoundInScreenPixel * 255);
-        //v = Ints.constrainToRange(v, 0, 255);
+        v = constrainToRange(v, 0, 255);
         paint.setARGB(255, 255 - v, 255 - v, 255);
       }
     }
+  }
+
+  public static int constrainToRange(int val, int min, int max) {
+    return Math.max(min, Math.min(max, val));
   }
 
   public GraphicOverlay(Context context, AttributeSet attrs) {
@@ -251,8 +253,8 @@ public class GraphicOverlay extends View {
    *     front camera.
    */
   public void setImageSourceInfo(int imageWidth, int imageHeight, boolean isFlipped) {
-    //Preconditions.checkState(imageWidth > 0, "image width must be positive");
-    //Preconditions.checkState(imageHeight > 0, "image height must be positive");
+    if (imageWidth<=0) Log.e("GraphicOverlay","image width must be positive");
+    if (imageHeight<=0) Log.e("GraphicOverlay","image height must be positive");
     synchronized (lock) {
       this.imageWidth = imageWidth;
       this.imageHeight = imageHeight;
@@ -287,7 +289,6 @@ public class GraphicOverlay extends View {
       scaleFactor = (float) getHeight() / imageHeight;
       postScaleWidthOffset = ((float) getHeight() * imageAspectRatio - getWidth()) / 2;
     }
-
     transformationMatrix.reset();
     transformationMatrix.setScale(scaleFactor, scaleFactor);
     transformationMatrix.postTranslate(-postScaleWidthOffset, -postScaleHeightOffset);
@@ -295,7 +296,6 @@ public class GraphicOverlay extends View {
     if (isImageFlipped) {
       transformationMatrix.postScale(-1f, 1f, getWidth() / 2f, getHeight() / 2f);
     }
-
     needUpdateTransformation = false;
   }
 

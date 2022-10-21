@@ -10,80 +10,24 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.mlkitposebasic.databinding.ActivityMainBinding
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.PoseDetector
-import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-typealias PoseResultListener = (seDetectaCuerpo : Boolean) -> Unit
-
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-    private lateinit var poseDetector : PoseDetector
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var graphicOverlay: GraphicOverlay
-
-    private class PoseAnalyzer(val poseDetector: PoseDetector,
-                               val graphicOverlay: GraphicOverlay,
-                               val cameraSelector: CameraSelector,
-                               val listener: PoseResultListener) : ImageAnalysis.Analyzer {
-        @SuppressLint("UnsafeOptInUsageError", "RestrictedApi")
-        override fun analyze(imageProxy: ImageProxy) {
-            val mediaImage = imageProxy.image
-            if (mediaImage != null) {
-                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-                //TODO Posiblemente este código pueda ejecutarse solo una vez cuando se selecciona la cámara
-                val isImageFlipped = cameraSelector.lensFacing == CameraSelector.LENS_FACING_FRONT
-                val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-                if (rotationDegrees == 0 || rotationDegrees == 180) {
-                    graphicOverlay.setImageSourceInfo(imageProxy.width, imageProxy.height, isImageFlipped)
-                } else {
-                    graphicOverlay.setImageSourceInfo(imageProxy.height, imageProxy.width, isImageFlipped)
-                }
-
-                // Pass image to an ML Kit Vision API
-                poseDetector.process(image)
-                    .addOnSuccessListener { pose ->
-                        // Task completed successfully
-                        graphicOverlay.clear()
-                        if (pose.allPoseLandmarks.isEmpty())
-                            listener(false)
-                        else {
-                            listener(true)
-                            val poseGraphic = PoseGraphic(graphicOverlay,pose, false,false,false)
-                            graphicOverlay.add(poseGraphic)
-                        }
-                        imageProxy.close()
-                    }
-                    .addOnFailureListener { e ->
-                        // Task failed with an exception
-                        listener(false)
-                        imageProxy.close()
-                    }
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         graphicOverlay = binding.graphicOverlay
-
-        // Accurate pose detector
-        val options = AccuratePoseDetectorOptions.Builder()
-            .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
-            .build()
-        poseDetector = PoseDetection.getClient(options)
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -100,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor.shutdown()
     }
 
+    @SuppressLint("RestrictedApi")
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -119,8 +64,9 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (poseDetector, graphicOverlay, cameraSelector){ hayCuerpo ->
-                        Log.d(TAG, "Se detecta cuerpo: $hayCuerpo")
+                    val isImageFlipped = cameraSelector.lensFacing == CameraSelector.LENS_FACING_FRONT
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer (graphicOverlay, isImageFlipped){
+                            hayPersona -> Log.d(TAG, "Se detecta persona: $hayPersona")
                     })
                 }
             try {
@@ -167,5 +113,4 @@ class MainActivity : AppCompatActivity() {
                 }
             }.toTypedArray()
     }
-
 }
